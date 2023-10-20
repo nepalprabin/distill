@@ -1,22 +1,25 @@
 import requests
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
+
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # custom import
-from app.models.file_model import InputModel
+from app.models.file import InputModel
 from app.services.file_service import parse_file
 
 router = APIRouter()
 
 
-@router.post("/v1/parse-data")
+@router.post("/v1/chunks")
 def fetch_file(
     request_data: InputModel,
 ):
     file_url = request_data.url
     file_type = request_data.type
-    text = request_data.text
+    chunk_data = request_data.chunks
     # Fetch the file
-
+    print(file_type)
     if file_type in ["pdf", "txt", "docx"]:
         print("Here")
         response = requests.get(file_url)
@@ -39,4 +42,17 @@ def fetch_file(
 
         url_file_type = MIME_MAP.get(content_type, "unknown")
         parsed_text = parse_file(url_file_type, response)
-        return parsed_text
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_data.chunk_size,
+            chunk_overlap=chunk_data.chunk_overlap,
+            length_function=len,
+            add_start_index=True,
+        )
+        documents = text_splitter.create_documents([parsed_text])
+        output = {}
+        chunks = [
+            {"chunk": doc.page_content, "metadata": doc.metadata} for doc in documents
+        ]
+        output["chunks"] = chunks
+        return JSONResponse(content=output, status_code=200)
