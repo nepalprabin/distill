@@ -3,12 +3,20 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings import GPT4AllEmbeddings
 
 # custom import
 from app.models.file import InputModel
 from app.services.file_service import parse_file
 
 router = APIRouter()
+
+embedding_model = GPT4AllEmbeddings()
+
+
+def create_embeddings(text):
+    query_result = embedding_model.embed_query(text)
+    return query_result
 
 
 @router.post("/v1/chunks")
@@ -52,7 +60,12 @@ def fetch_file(
         documents = text_splitter.create_documents([parsed_text])
         output = {}
         chunks = [
-            {"chunk": doc.page_content, "metadata": doc.metadata} for doc in documents
+            {
+                "chunk": doc.page_content,
+                "embeddings": create_embeddings(doc.page_content),
+                "metadata": doc.metadata,
+            }
+            for doc in documents
         ]
         output["chunks"] = chunks
         return JSONResponse(content=output, status_code=200)
